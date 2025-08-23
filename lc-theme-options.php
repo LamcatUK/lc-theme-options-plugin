@@ -409,11 +409,27 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 		public function redirect_post_pages() {
 			global $pagenow;
 
+
 			$post_pages = array( 'edit.php', 'post-new.php', 'post.php' );
 
-			if ( in_array( $pagenow, $post_pages, true ) && ( ! isset( $_GET['post_type'] ) || 'post' === $_GET['post_type'] ) ) {
-				wp_safe_redirect( admin_url() );
-				exit;
+			// Only redirect if editing a standard post, not custom post types (e.g. acf-field-group)
+			if ( in_array( $pagenow, $post_pages, true ) ) {
+				$post_type = null;
+				if ( isset( $_GET['post_type'] ) ) {
+					$post_type = $_GET['post_type'];
+				} elseif ( isset( $_GET['post'] ) ) {
+					$post_id = intval( $_GET['post'] );
+					if ( $post_id ) {
+						$post_obj = get_post( $post_id );
+						if ( $post_obj ) {
+							$post_type = $post_obj->post_type;
+						}
+					}
+				}
+				if ( $post_type === 'post' || ( ! isset( $post_type ) && $pagenow !== 'post.php' ) ) {
+					wp_safe_redirect( admin_url() );
+					exit;
+				}
 			}
 		}
 
