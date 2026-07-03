@@ -2,8 +2,8 @@
 /**
  * Plugin Name: LC Theme Options
  * Plugin URI: https://github.com/LamcatUK/lc-theme-options
- * Description: A WordPress plugin to manage theme options including disabling blog, comments, and gravatars.
- * Version: 1.0.0
+ * Description: A WordPress plugin to manage theme options including disabling blog, comments, gravatars, tags, emojis, and more.
+ * Version: 1.2.0
  * Author: Lamcat - DS
  * License: GPL v2 or later
  *
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Define plugin constants.
 if ( ! defined( 'LC_THEME_OPTIONS_VERSION' ) ) {
-	define( 'LC_THEME_OPTIONS_VERSION', '1.0.0' );
+	define( 'LC_THEME_OPTIONS_VERSION', '1.2.0' );
 }
 if ( ! defined( 'LC_THEME_OPTIONS_PLUGIN_DIR' ) ) {
 	define( 'LC_THEME_OPTIONS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -30,7 +30,7 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 	/**
 	 * Class LCThemeOptions
 	 *
-	 * Handles the LC Theme Options plugin functionality including disabling blog, comments, and gravatars.
+	 * Handles the LC Theme Options plugin functionality including disabling blog, comments, gravatars, tags, emojis, and more.
 	 *
 	 * @package LC_Theme_Options
 	 */
@@ -53,12 +53,13 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 		 * @return void
 		 */
 		public static function activate() {
-			// Set default options.
 			$default_options = array(
-				'disable_blog'      => 0,
-				'disable_comments'  => 1,
-				'disable_gravatars' => 1,
-				'disable_tags'      => 0,
+				'disable_blog'                => 0,
+				'disable_comments'            => 1,
+				'disable_gravatars'           => 1,
+				'disable_tags'                => 0,
+				'disable_emojis'              => 0,
+				'suppress_object_cache_warning' => 0,
 			);
 			add_option( 'lc_theme_options', $default_options );
 		}
@@ -69,21 +70,15 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 		 * @return void
 		 */
 		public static function deactivate() {
-			// Optional: Clean up options on deactivation.
-			// delete_option('lc_theme_options');
 		}
 
 		/**
-		 * LCThemeOptions constructor.
-		 *
-		 * Initializes the plugin by hooking into WordPress actions.
-		 */
-		/**
-		 * Constructor: Only load admin code in admin area.
+		 * Constructor: initialize globally so frontend filters work.
 		 */
 		public function __construct() {
+			add_action( 'init', array( $this, 'init' ) );
+
 			if ( is_admin() ) {
-				add_action( 'init', array( $this, 'init' ) );
 				add_action( 'init', array( $this, 'remove_block_editor_discussion_panel' ), 100 );
 				add_action( 'admin_head', array( $this, 'hide_block_editor_discussion_panel_css' ), 100 );
 			}
@@ -93,13 +88,8 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 		 * Initialize plugin hooks and apply blog restrictions.
 		 */
 		public function init() {
-			// Add admin menu.
 			add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
-
-			// Initialize settings.
 			add_action( 'admin_init', array( $this, 'settings_init' ) );
-
-			// Apply functionality based on settings.
 			$this->apply_blog_restrictions();
 		}
 
@@ -122,7 +112,6 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 				return;
 			}
 			$screen = get_current_screen();
-			// Only output CSS on block editor screens for post/page types
 			if ( $screen && isset( $screen->post_type ) && in_array( $screen->post_type, array( 'post', 'page' ) ) && method_exists( $screen, 'is_block_editor' ) && $screen->is_block_editor() ) {
 				echo '<style>
 				.edit-post-sidebar .components-panel__body[data-title="Discussion"] { display: none !important; }
@@ -191,16 +180,35 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 				'lc_theme_options',
 				'lc_theme_options_section'
 			);
+
+			add_settings_field(
+				'disable_emojis',
+				__( 'Disable Emojis', 'lc-theme-options' ),
+				array( $this, 'disable_emojis_render' ),
+				'lc_theme_options',
+				'lc_theme_options_section'
+			);
+
+			add_settings_field(
+				'suppress_object_cache_warning',
+				__( 'Suppress Object Cache Warning', 'lc-theme-options' ),
+				array( $this, 'suppress_object_cache_warning_render' ),
+				'lc_theme_options',
+				'lc_theme_options_section'
+			);
 		}
+
 		/**
 		 * Sanitize and validate options before saving.
 		 */
 		public function sanitize_options( $input ) {
 			$output = array();
-			$output['disable_blog']      = !empty( $input['disable_blog'] ) ? 1 : 0;
-			$output['disable_comments']  = !empty( $input['disable_comments'] ) ? 1 : 0;
-			$output['disable_gravatars'] = !empty( $input['disable_gravatars'] ) ? 1 : 0;
-			$output['disable_tags']      = !empty( $input['disable_tags'] ) ? 1 : 0;
+			$output['disable_blog']                = ! empty( $input['disable_blog'] ) ? 1 : 0;
+			$output['disable_comments']            = ! empty( $input['disable_comments'] ) ? 1 : 0;
+			$output['disable_gravatars']           = ! empty( $input['disable_gravatars'] ) ? 1 : 0;
+			$output['disable_tags']                = ! empty( $input['disable_tags'] ) ? 1 : 0;
+			$output['disable_emojis']              = ! empty( $input['disable_emojis'] ) ? 1 : 0;
+			$output['suppress_object_cache_warning'] = ! empty( $input['suppress_object_cache_warning'] ) ? 1 : 0;
 			return $output;
 		}
 
@@ -260,12 +268,36 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 		}
 
 		/**
+		 * Render disable emojis checkbox
+		 */
+		public function disable_emojis_render() {
+			$options = get_option( $this->option_name );
+			$checked = isset( $options['disable_emojis'] ) ? $options['disable_emojis'] : 0;
+			?>
+			<input type="checkbox" id="disable_emojis" name="<?php echo esc_attr( $this->option_name ); ?>[disable_emojis]" value="1" <?php checked( 1, $checked ); ?>>
+			<label for="disable_emojis"><?php esc_html_e( 'Disable WordPress Emojis (removes emoji scripts/styles from frontend and admin)', 'lc-theme-options' ); ?></label>
+			<?php
+		}
+
+		/**
+		 * Render suppress object cache warning checkbox
+		 */
+		public function suppress_object_cache_warning_render() {
+			$options = get_option( $this->option_name );
+			$checked = isset( $options['suppress_object_cache_warning'] ) ? $options['suppress_object_cache_warning'] : 0;
+			?>
+			<input type="checkbox" id="suppress_object_cache_warning" name="<?php echo esc_attr( $this->option_name ); ?>[suppress_object_cache_warning]" value="1" <?php checked( 1, $checked ); ?>>
+			<label for="suppress_object_cache_warning"><?php esc_html_e( 'Suppress Site Health "persistent object cache" warning (useful for small sites where object caching is unnecessary)', 'lc-theme-options' ); ?></label>
+			<?php
+		}
+
+		/**
 		 * Options page HTML
 		 */
 		public function options_page() {
 			?>
 			<div class="wrap">
-				<h1>LC Theme Options</h1>
+				<h1><?php esc_html_e( 'LC Theme Options', 'lc-theme-options' ); ?></h1>
 				<form action="options.php" method="post">
 					<?php
 					settings_fields( 'lc_theme_options' );
@@ -274,10 +306,9 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 					?>
 				</form>
 			</div>
-			
+
 			<script>
 			jQuery(document).ready(function($) {
-				// Handle disable blog checkbox logic
 				$('#disable_blog').change(function() {
 					if ($(this).is(':checked')) {
 						$('#disable_comments').prop('checked', true);
@@ -285,12 +316,11 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 						$('#disable_tags').prop('checked', true);
 					}
 				});
-				
-				// Prevent unchecking comments/gravatars/tags if blog is disabled
+
 				$('#disable_comments, #disable_gravatars, #disable_tags').change(function() {
 					if (!$(this).is(':checked') && $('#disable_blog').is(':checked')) {
 						$(this).prop('checked', true);
-						alert('Comments, Gravatars, and Tags cannot be enabled while blog is disabled.');
+						alert('<?php echo esc_js( __( 'Comments, Gravatars, and Tags cannot be enabled while blog is disabled.', 'lc-theme-options' ) ); ?>');
 					}
 				});
 			});
@@ -304,14 +334,21 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 		public function apply_blog_restrictions() {
 			$options = get_option( $this->option_name );
 
+			// Add the LC dashboard widget.
+			add_action( 'wp_dashboard_setup', array( $this, 'register_lc_dashboard_widget' ) );
+
 			// Always remove unwanted dashboard widgets.
 			add_action( 'wp_dashboard_setup', array( $this, 'remove_unwanted_dashboard_widgets' ) );
+
+			// Suppress persistent object cache warning in Site Health if enabled.
+			if ( isset( $options['suppress_object_cache_warning'] ) && $options['suppress_object_cache_warning'] ) {
+				add_filter( 'site_status_should_suggest_persistent_object_cache', '__return_false' );
+			}
 
 			// Check if blog is disabled.
 			if ( isset( $options['disable_blog'] ) && $options['disable_blog'] ) {
 				$this->disable_blog_functionality();
 			} else {
-				// Check individual options.
 				if ( isset( $options['disable_comments'] ) && $options['disable_comments'] ) {
 					$this->disable_comments_functionality();
 				}
@@ -324,6 +361,64 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 					$this->disable_tags_functionality();
 				}
 			}
+
+			// Check if emojis should be disabled.
+			if ( isset( $options['disable_emojis'] ) && $options['disable_emojis'] ) {
+				add_action( 'init', array( $this, 'disable_emojis_functionality' ), 1 );
+			}
+		}
+
+		/**
+		 * Disable WordPress emoji scripts/styles.
+		 */
+		public function disable_emojis_functionality() {
+			remove_action( 'wp_head', 'print_emoji_detection_script', 7 );
+			remove_action( 'admin_print_scripts', 'print_emoji_detection_script' );
+			remove_action( 'wp_print_styles', 'print_emoji_styles' );
+			remove_action( 'admin_print_styles', 'print_emoji_styles' );
+			remove_filter( 'the_content_feed', 'wp_staticize_emoji' );
+			remove_filter( 'comment_text_rss', 'wp_staticize_emoji' );
+			remove_filter( 'wp_mail', 'wp_staticize_emoji_for_email' );
+			add_filter( 'tiny_mce_plugins', array( $this, 'disable_emojis_tinymce' ) );
+			add_filter( 'emoji_svg_url', '__return_false' );
+		}
+
+		/**
+		 * Remove the emoji plugin from TinyMCE.
+		 *
+		 * @param array $plugins List of TinyMCE plugins.
+		 * @return array Modified list of plugins.
+		 */
+		public function disable_emojis_tinymce( $plugins ) {
+			if ( is_array( $plugins ) ) {
+				return array_diff( $plugins, array( 'wpemoji' ) );
+			}
+			return $plugins;
+		}
+
+		/**
+		 * Register the custom LC dashboard widget.
+		 */
+		public function register_lc_dashboard_widget() {
+			wp_add_dashboard_widget(
+				'lc_dashboard_widget',
+				'LC Theme Options',
+				array( $this, 'lc_dashboard_widget_display' )
+			);
+		}
+
+		/**
+		 * Display the custom LC dashboard widget.
+		 */
+		public function lc_dashboard_widget_display() {
+			?>
+			<div>
+				<p><strong><?php esc_html_e( 'Thanks for using LC Theme Options!', 'lc-theme-options' ); ?></strong></p>
+				<hr>
+				<p><?php esc_html_e( 'This plugin helps you manage various WordPress theme options including blog, comments, gravatars, tags, and emojis.', 'lc-theme-options' ); ?></p>
+				<p><?php esc_html_e( 'Configure the settings under Tools > LC Theme Options.', 'lc-theme-options' ); ?></p>
+			</div>
+			<?php
 		}
 
 		/**
@@ -342,12 +437,16 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 			// Remove "Activity" widget.
 			remove_meta_box( 'dashboard_activity', 'dashboard', 'normal' );
 
+			// Remove "Recent Comments" widget.
+			remove_meta_box( 'dashboard_recent_comments', 'dashboard', 'normal' );
+
+			// Remove "Recent Drafts" widget.
+			remove_meta_box( 'dashboard_recent_drafts', 'dashboard', 'side' );
+
 			// Remove Yoast SEO widgets.
 			remove_meta_box( 'yoast_db_widget', 'dashboard', 'normal' );
 			remove_meta_box( 'wpseo-dashboard-overview', 'dashboard', 'normal' );
 			remove_meta_box( 'wpseo-wincher-dashboard-overview', 'dashboard', 'normal' );
-
-			// Remove additional Yoast widgets that might exist.
 			remove_meta_box( 'yoast_seo_posts_overview', 'dashboard', 'normal' );
 			remove_meta_box( 'yoast_seo_posts_overview', 'dashboard', 'side' );
 			remove_meta_box( 'wpseo_dashboard_widget', 'dashboard', 'normal' );
@@ -366,9 +465,6 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 			// Redirect post-related pages.
 			add_action( 'admin_init', array( $this, 'redirect_post_pages' ) );
 
-			// Remove post-related dashboard widgets.
-			add_action( 'wp_dashboard_setup', array( $this, 'remove_post_dashboard_widgets' ) );
-
 			// Disable comments and gravatars as well.
 			$this->disable_comments_functionality();
 			$this->disable_gravatars_functionality();
@@ -376,9 +472,6 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 
 			// Remove blog-related admin bar items.
 			add_action( 'admin_bar_menu', array( $this, 'remove_blog_admin_bar_items' ), 999 );
-
-			// Hide blog-related quick draft widget.
-			add_action( 'wp_dashboard_setup', array( $this, 'remove_quick_draft_widget' ) );
 		}
 
 		/**
@@ -409,37 +502,31 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 		public function redirect_post_pages() {
 			global $pagenow;
 
-
 			$post_pages = array( 'edit.php', 'post-new.php', 'post.php' );
 
-			// Only redirect if editing a standard post, not custom post types (e.g. acf-field-group)
 			if ( in_array( $pagenow, $post_pages, true ) ) {
-				$post_type = null;
-				if ( isset( $_GET['post_type'] ) ) {
-					$post_type = $_GET['post_type'];
-				} elseif ( isset( $_GET['post'] ) ) {
-					$post_id = intval( $_GET['post'] );
-					if ( $post_id ) {
-						$post_obj = get_post( $post_id );
-						if ( $post_obj ) {
-							$post_type = $post_obj->post_type;
-						}
-					}
-				}
-				if ( $post_type === 'post' || ( ! isset( $post_type ) && $pagenow !== 'post.php' ) ) {
-					wp_safe_redirect( admin_url() );
-					exit;
-				}
-			}
-		}
+				$current_post_type = null;
 
-		/**
-		 * Remove post-related dashboard widgets
-		 */
-		public function remove_post_dashboard_widgets() {
-			remove_meta_box( 'dashboard_recent_drafts', 'dashboard', 'side' );
-			remove_meta_box( 'dashboard_quick_press', 'dashboard', 'side' );
-			remove_meta_box( 'dashboard_activity', 'dashboard', 'normal' );
+				if ( isset( $_REQUEST['post_type'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+					$current_post_type = sanitize_text_field( wp_unslash( $_REQUEST['post_type'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				} elseif ( isset( $_REQUEST['post'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+					$post_id           = intval( $_REQUEST['post'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+					$current_post_type = get_post_type( $post_id );
+				}
+
+				if ( null === $current_post_type || 'post' !== $current_post_type ) {
+					return;
+				}
+
+				$allowed_actions = array( 'trash', 'delete', 'bulk-delete', 'bulk-trash' );
+				$action          = isset( $_REQUEST['action'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['action'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				if ( $action && in_array( $action, $allowed_actions, true ) ) {
+					return;
+				}
+
+				wp_safe_redirect( admin_url() );
+				exit;
+			}
 		}
 
 		/**
@@ -452,23 +539,18 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 		}
 
 		/**
-		 * Remove quick draft widget
-		 */
-		public function remove_quick_draft_widget() {
-			remove_meta_box( 'dashboard_quick_press', 'dashboard', 'side' );
-		}
-
-		/**
 		 * Disable comments functionality
 		 */
 		private function disable_comments_functionality() {
 			// Disable comments support for all post types.
 			add_action( 'init', array( $this, 'disable_comments_post_types_support' ) );
 
-			// Force comments and pings closed everywhere.
-			add_filter( 'comments_open', '__return_false', 100, 2 );
-			add_filter( 'pings_open', '__return_false', 100, 2 );
-			add_filter( 'comments_array', '__return_empty_array', 100, 2 );
+			// Close comments on existing posts.
+			add_filter( 'comments_open', '__return_false', 20, 2 );
+			add_filter( 'pings_open', '__return_false', 20, 2 );
+
+			// Hide existing comments.
+			add_filter( 'comments_array', '__return_empty_array', 10, 2 );
 
 			// Remove comment status from REST API responses.
 			add_filter( 'rest_endpoints', function( $endpoints ) {
@@ -516,8 +598,6 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 				return $response;
 			}, 100 );
 		}
-
-
 
 		/**
 		 * Disable comments support for post types
@@ -600,6 +680,7 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 				remove_post_editor_support( 'page', 'comments' );
 			}
 		}
+
 		/**
 		 * Remove Comments column from posts/pages list tables
 		 */
@@ -610,19 +691,12 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 			return $columns;
 		}
 
-
-
 		/**
 		 * Disable Gravatars functionality
 		 */
 		private function disable_gravatars_functionality() {
-			// Disable gravatars.
 			add_filter( 'pre_option_show_avatars', '__return_zero' );
-
-			// Remove avatar from user profile.
 			add_filter( 'user_profile_picture_description', '__return_empty_string' );
-
-			// Replace avatar with blank image or remove entirely.
 			add_filter( 'get_avatar', array( $this, 'disable_gravatar' ), 10, 5 );
 		}
 
@@ -643,14 +717,10 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 		/**
 		 * Disable Tags functionality
 		 */
-		public function disable_tags_functionality() {
-			// Remove tags support from posts.
-			add_action( 'init', array( $this, 'unregister_tags' ) );
-			add_action( 'init', array( $this, 'remove_post_tag_support' ), 999 );
-			add_action( 'init', array( $this, 'completely_remove_tags' ), 999 );
+		private function disable_tags_functionality() {
+			add_action( 'init', array( $this, 'unregister_tags' ), 999 );
 			add_action( 'admin_menu', array( $this, 'remove_tags_menu' ) );
 			add_action( 'add_meta_boxes', array( $this, 'remove_tags_metabox' ), 999 );
-			add_action( 'admin_head', array( $this, 'hide_tags_with_css' ) );
 		}
 
 		/**
@@ -658,24 +728,16 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 		 */
 		public function unregister_tags() {
 			unregister_taxonomy_for_object_type( 'post_tag', 'post' );
-		}
 
-		/**
-		 * Completely remove tags taxonomy
-		 */
-		public function completely_remove_tags() {
 			global $wp_taxonomies;
 			if ( isset( $wp_taxonomies['post_tag'] ) ) {
-				unset( $wp_taxonomies['post_tag'] );
+				$wp_taxonomies['post_tag']->show_ui            = false;
+				$wp_taxonomies['post_tag']->show_in_menu       = false;
+				$wp_taxonomies['post_tag']->show_in_nav_menus  = false;
+				$wp_taxonomies['post_tag']->show_tagcloud      = false;
+				$wp_taxonomies['post_tag']->show_in_quick_edit = false;
+				$wp_taxonomies['post_tag']->show_admin_column  = false;
 			}
-			unregister_taxonomy( 'post_tag' );
-		}
-
-		/**
-		 * Remove post tag support entirely
-		 */
-		public function remove_post_tag_support() {
-			remove_post_type_support( 'post', 'post-tags' );
 		}
 
 		/**
@@ -690,39 +752,12 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 		 */
 		public function remove_tags_metabox() {
 			remove_meta_box( 'tagsdiv-post_tag', 'post', 'side' );
-			remove_meta_box( 'tagsdiv-post_tag', 'post', 'normal' );
-			remove_meta_box( 'tagsdiv-post_tag', 'post', 'advanced' );
-			// Also try alternative names.
-			remove_meta_box( 'post_tag', 'post', 'side' );
-			remove_meta_box( 'post_tagdiv', 'post', 'side' );
-			remove_meta_box( 'post_tag', 'post', 'normal' );
-			remove_meta_box( 'post_tagdiv', 'post', 'normal' );
 		}
 
-		/**
-		 * Hide tags metabox with CSS as last resort
-		 */
-		public function hide_tags_with_css() {
-			global $pagenow;
-
-			if ( in_array( $pagenow, array( 'post.php', 'post-new.php' ) ) ) {
-				echo '<style>
-					#tagsdiv-post_tag,
-					#post_tag,
-					#post_tagdiv,
-					.tagsdiv,
-					.postbox#tagsdiv-post_tag,
-					div[id*="tag"],
-					.meta-box-sortables #tagsdiv-post_tag {
-						display: none !important;
-					}
-				</style>';
-			}
-		}
 	}
-} // End if class_exists check.
+}
 
-// Initialize the plugin only if the class exists and hasn't been initialized yet.
+// Initialize the plugin globally so frontend filters are registered.
 if ( class_exists( 'LCThemeOptions' ) && ! isset( $GLOBALS['lc_theme_options_instance'] ) ) {
 	$GLOBALS['lc_theme_options_instance'] = new LCThemeOptions();
 }
@@ -736,4 +771,57 @@ if ( ! function_exists( 'lc_theme_options_activation_check' ) ) {
 if ( ! function_exists( 'lc_theme_options_deactivation_check' ) ) {
 	register_deactivation_hook( __FILE__, array( 'LCThemeOptions', 'deactivate' ) );
 }
-?>
+
+// Add a 'Theme Options' link to the plugin's action links on the Installed Plugins page.
+add_filter(
+	'plugin_action_links_lc-theme-options/lc-theme-options.php',
+	function ( $links ) {
+		$settings_link = '<a href="' . admin_url( 'tools.php?page=lc-theme-options' ) . '">' . __( 'Theme Options', 'lc-theme-options' ) . '</a>';
+		array_unshift( $links, $settings_link );
+		return $links;
+	}
+);
+
+/**
+ * Globally disable WordPress emojis as early as possible if option is set.
+ */
+add_action(
+	'plugins_loaded',
+	function () {
+		$options = get_option( 'lc_theme_options' );
+		if ( isset( $options['disable_emojis'] ) && $options['disable_emojis'] ) {
+			remove_action( 'admin_print_styles', 'print_emoji_styles' );
+			remove_action( 'wp_head', 'print_emoji_detection_script', 7 );
+			remove_action( 'admin_print_scripts', 'print_emoji_detection_script' );
+			remove_action( 'wp_print_styles', 'print_emoji_styles' );
+			remove_filter( 'the_content_feed', 'wp_staticize_emoji' );
+			remove_filter( 'comment_text_rss', 'wp_staticize_emoji' );
+			remove_filter( 'wp_mail', 'wp_staticize_emoji_for_email' );
+			add_filter( 'emoji_svg_url', '__return_false' );
+			add_filter(
+				'tiny_mce_plugins',
+				function ( $plugins ) {
+					if ( is_array( $plugins ) ) {
+						return array_diff( $plugins, array( 'wpemoji' ) );
+					}
+					return $plugins;
+				}
+			);
+		}
+	},
+	1
+);
+
+/**
+ * Force all ACF blocks to always display in edit mode in the block editor.
+ * This JS subscriber watches the block store and resets any ACF block that drifts to preview/auto.
+ */
+add_action(
+	'enqueue_block_editor_assets',
+	function () {
+		wp_add_inline_script(
+			'wp-block-editor',
+			"( function () {\n\tvar pending = {};\n\tvar watcherStarted = false;\n\n\tfunction getEditorSelect() {\n\t\treturn window.wp && wp.data && wp.data.select ? wp.data.select( 'core/block-editor' ) : null;\n\t}\n\n\tfunction getEditorDispatch() {\n\t\treturn window.wp && wp.data && wp.data.dispatch ? wp.data.dispatch( 'core/block-editor' ) : null;\n\t}\n\n\tfunction queueEditMode( clientId ) {\n\t\tif ( pending[ clientId ] ) {\n\t\t\treturn;\n\t\t}\n\n\t\tpending[ clientId ] = true;\n\n\t\twindow.requestAnimationFrame( function () {\n\t\t\tvar select = getEditorSelect();\n\t\t\tvar dispatch = getEditorDispatch();\n\t\t\tvar block = select && select.getBlock ? select.getBlock( clientId ) : null;\n\n\t\t\tpending[ clientId ] = false;\n\n\t\t\tif ( ! block || ! block.name || block.name.indexOf( 'acf/' ) !== 0 ) {\n\t\t\t\treturn;\n\t\t\t}\n\n\t\t\tif ( block.attributes && block.attributes.mode === 'edit' ) {\n\t\t\t\treturn;\n\t\t\t}\n\n\t\t\tif ( dispatch && dispatch.updateBlockAttributes ) {\n\t\t\t\tdispatch.updateBlockAttributes( clientId, { mode: 'edit' } );\n\t\t\t\twindow.setTimeout( function () {\n\t\t\t\t\tvar refreshedSelect = getEditorSelect();\n\t\t\t\t\tvar refreshedBlock = refreshedSelect && refreshedSelect.getBlock ? refreshedSelect.getBlock( clientId ) : null;\n\n\t\t\t\t\tif ( refreshedBlock && refreshedBlock.attributes && refreshedBlock.attributes.mode !== 'edit' ) {\n\t\t\t\t\t\tqueueEditMode( clientId );\n\t\t\t\t\t}\n\t\t\t\t}, 50 );\n\t\t\t}\n\t\t} );\n\t}\n\n\tfunction forceAllAcfBlocksToEdit() {\n\t\tvar select = getEditorSelect();\n\t\tvar clientIds = select && select.getClientIdsWithDescendants ? select.getClientIdsWithDescendants() : [];\n\n\t\tclientIds.forEach( function ( clientId ) {\n\t\t\tvar blockName = select.getBlockName ? select.getBlockName( clientId ) : '';\n\n\t\t\tif ( blockName && blockName.indexOf( 'acf/' ) === 0 ) {\n\t\t\t\tqueueEditMode( clientId );\n\t\t\t}\n\t\t} );\n\t}\n\n\tfunction startWatcher() {\n\t\tif ( watcherStarted ) {\n\t\t\treturn;\n\t\t}\n\n\t\twatcherStarted = true;\n\n\t\tforceAllAcfBlocksToEdit();\n\n\t\twp.data.subscribe( function () {\n\t\t\twindow.requestAnimationFrame( function () {\n\t\t\t\tforceAllAcfBlocksToEdit();\n\t\t\t} );\n\t\t} );\n\t}\n\n\tif ( document.readyState === 'complete' || document.readyState === 'interactive' ) {\n\t\tstartWatcher();\n\t} else {\n\t\tdocument.addEventListener( 'DOMContentLoaded', startWatcher );\n\t}\n} )()"
+		);
+	}
+);
