@@ -3,7 +3,7 @@
  * Plugin Name: LC Theme Options
  * Plugin URI: https://github.com/LamcatUK/lc-theme-options
  * Description: A WordPress plugin to manage theme options including disabling blog, comments, gravatars, tags, emojis, and more.
- * Version: 1.2.2
+ * Version: 1.2.4
  * Author: Lamcat - DS
  * License: GPL v2 or later
  *
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Define plugin constants.
 if ( ! defined( 'LC_THEME_OPTIONS_VERSION' ) ) {
-	define( 'LC_THEME_OPTIONS_VERSION', '1.2.2' );
+	define( 'LC_THEME_OPTIONS_VERSION', '1.2.4' );
 }
 if ( ! defined( 'LC_THEME_OPTIONS_PLUGIN_DIR' ) ) {
 	define( 'LC_THEME_OPTIONS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -77,7 +77,7 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 		 */
 		public function __construct() {
 			add_action( 'init', array( $this, 'init' ) );
-			add_action( 'enqueue_block_editor_assets', array( $this, 'enqueue_editor_width_styles' ) );
+			add_filter( 'block_editor_settings_all', array( $this, 'filter_editor_width_settings' ), 10, 2 );
 
 			if ( is_admin() ) {
 				add_action( 'init', array( $this, 'remove_block_editor_discussion_panel' ), 100 );
@@ -403,12 +403,26 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 		 * Mirrors the shared theme editor layout so themes do not need to ship
 		 * their own block editor width override.
 		 *
-		 * @return void
+		 * @param array $editor_settings The block editor settings.
+		 * @param WP_Block_Editor_Context $editor_context The current editor context.
+		 * @return array
 		 */
-		public function enqueue_editor_width_styles() {
+		public function filter_editor_width_settings( $editor_settings, $editor_context ) {
 			$editor_css = '
+				.editor-styles-wrapper .is-root-container > :where(:not([data-align="wide"]):not([data-align="full"])) {
+					max-width: 1140px;
+					margin-left: auto;
+					margin-right: auto;
+				}
+
 				.editor-styles-wrapper .wp-block {
 					max-width: 1140px;
+					margin-left: auto;
+					margin-right: auto;
+				}
+
+				.editor-styles-wrapper .is-root-container > [data-align="wide"] {
+					max-width: 1320px;
 					margin-left: auto;
 					margin-right: auto;
 				}
@@ -417,12 +431,24 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 					max-width: 1320px;
 				}
 
+				.editor-styles-wrapper .is-root-container > [data-align="full"] {
+					max-width: none;
+				}
+
 				.editor-styles-wrapper .wp-block[data-align="full"] {
 					max-width: none;
 				}
 			';
 
-			wp_add_inline_style( 'wp-edit-blocks', $editor_css );
+			if ( ! isset( $editor_settings['styles'] ) || ! is_array( $editor_settings['styles'] ) ) {
+				$editor_settings['styles'] = array();
+			}
+
+			$editor_settings['styles'][] = array(
+				'css' => $editor_css,
+			);
+
+			return $editor_settings;
 		}
 
 		/**
@@ -808,7 +834,7 @@ if ( ! function_exists( 'lc_theme_options_deactivation_check' ) ) {
 
 // Add a 'Theme Options' link to the plugin's action links on the Installed Plugins page.
 add_filter(
-	'plugin_action_links_lc-theme-options/lc-theme-options.php',
+	'plugin_action_links_lc-theme-options-plugin/lc-theme-options.php',
 	function ( $links ) {
 		$settings_link = '<a href="' . admin_url( 'tools.php?page=lc-theme-options' ) . '">' . __( 'Theme Options', 'lc-theme-options' ) . '</a>';
 		array_unshift( $links, $settings_link );

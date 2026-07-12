@@ -163,6 +163,10 @@ This plugin is provided as-is. For customizations or support, please contact the
 
 ## Changelog
 
+### 1.2.4
+- Fixed the plugin action-link hook for installs using the `lc-theme-options-plugin` directory name
+- Moved the editor width override into block-editor settings so it reaches the editor canvas iframe
+
 ### 1.2.2
 - Added a Gutenberg editor width override so the main content column is centered and widened without requiring theme CSS
 
