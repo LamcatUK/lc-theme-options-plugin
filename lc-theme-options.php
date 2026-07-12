@@ -3,7 +3,7 @@
  * Plugin Name: LC Theme Options
  * Plugin URI: https://github.com/LamcatUK/lc-theme-options
  * Description: A WordPress plugin to manage theme options including disabling blog, comments, gravatars, tags, emojis, and more.
- * Version: 1.2.0
+ * Version: 1.2.2
  * Author: Lamcat - DS
  * License: GPL v2 or later
  *
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Define plugin constants.
 if ( ! defined( 'LC_THEME_OPTIONS_VERSION' ) ) {
-	define( 'LC_THEME_OPTIONS_VERSION', '1.2.0' );
+	define( 'LC_THEME_OPTIONS_VERSION', '1.2.2' );
 }
 if ( ! defined( 'LC_THEME_OPTIONS_PLUGIN_DIR' ) ) {
 	define( 'LC_THEME_OPTIONS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -77,6 +77,7 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 		 */
 		public function __construct() {
 			add_action( 'init', array( $this, 'init' ) );
+			add_action( 'enqueue_block_editor_assets', array( $this, 'enqueue_editor_width_styles' ) );
 
 			if ( is_admin() ) {
 				add_action( 'init', array( $this, 'remove_block_editor_discussion_panel' ), 100 );
@@ -397,6 +398,34 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 		}
 
 		/**
+		 * Increase and center the Gutenberg content column.
+		 *
+		 * Mirrors the shared theme editor layout so themes do not need to ship
+		 * their own block editor width override.
+		 *
+		 * @return void
+		 */
+		public function enqueue_editor_width_styles() {
+			$editor_css = '
+				.editor-styles-wrapper .wp-block {
+					max-width: 1140px;
+					margin-left: auto;
+					margin-right: auto;
+				}
+
+				.editor-styles-wrapper .wp-block[data-align="wide"] {
+					max-width: 1320px;
+				}
+
+				.editor-styles-wrapper .wp-block[data-align="full"] {
+					max-width: none;
+				}
+			';
+
+			wp_add_inline_style( 'wp-edit-blocks', $editor_css );
+		}
+
+		/**
 		 * Register the custom LC dashboard widget.
 		 */
 		public function register_lc_dashboard_widget() {
@@ -411,12 +440,17 @@ if ( ! class_exists( 'LCThemeOptions' ) ) {
 		 * Display the custom LC dashboard widget.
 		 */
 		public function lc_dashboard_widget_display() {
+			$image_url = LC_THEME_OPTIONS_PLUGIN_URL . 'assets/images/lc-full.jpg';
 			?>
+			<div style="display: flex; align-items: center; justify-content: space-around; gap: 16px;">
+				<img style="width: 50%;" src="<?php echo esc_url( $image_url ); ?>" alt="<?php echo esc_attr__( 'Lamcat', 'lc-theme-options' ); ?>">
+				<a class="button button-primary" target="_blank" rel="noopener nofollow noreferrer" href="mailto:hello@lamcat.co.uk"><?php esc_html_e( 'Contact', 'lc-theme-options' ); ?></a>
+			</div>
 			<div>
-				<p><strong><?php esc_html_e( 'Thanks for using LC Theme Options!', 'lc-theme-options' ); ?></strong></p>
+				<p><strong><?php esc_html_e( 'Thanks for choosing Lamcat!', 'lc-theme-options' ); ?></strong></p>
 				<hr>
-				<p><?php esc_html_e( 'This plugin helps you manage various WordPress theme options including blog, comments, gravatars, tags, and emojis.', 'lc-theme-options' ); ?></p>
-				<p><?php esc_html_e( 'Configure the settings under Tools > LC Theme Options.', 'lc-theme-options' ); ?></p>
+				<p><?php esc_html_e( 'Got a problem with your site, or want to make some changes and need us to take a look for you?', 'lc-theme-options' ); ?></p>
+				<p><?php esc_html_e( 'Use the link above to get in touch and we\'ll get back to you ASAP.', 'lc-theme-options' ); ?></p>
 			</div>
 			<?php
 		}

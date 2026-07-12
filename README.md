@@ -44,7 +44,9 @@ A WordPress plugin that provides granular control over theme and blog functional
 
 - **ACF Block Edit Mode**: Forces Advanced Custom Fields blocks to stay in edit mode in the block editor, including immediately after a new block is inserted
 
-- **Dashboard Widget**: Adds an informational LC Theme Options dashboard widget
+- **Editor Width Override**: Increases and centers the Gutenberg content column so themes do not need to carry their own editor-width CSS
+
+- **Dashboard Widget**: Adds a branded Lamcat dashboard widget with a quick contact CTA
 
 ## Installation
 
@@ -111,7 +113,7 @@ The plugin adds a "LC Theme Options" page under the WordPress admin **Tools** me
 
 ## Technical Details
 
-- **Version**: 1.1.0
+- **Version**: 1.2.1
 - **Requires**: WordPress 4.0+
 - **Requires PHP**: 5.6+
 - **License**: GPL v2 or later
@@ -142,6 +144,7 @@ The plugin uses various WordPress hooks and filters to achieve its functionality
 - `admin_bar_menu` — For modifying admin bar
 - `add_meta_boxes` — For removing discussion and tags metaboxes
 - `enqueue_block_editor_assets` — For ACF block edit mode enforcement
+- `enqueue_block_editor_assets` — For ACF block edit mode enforcement and editor width styling
 - `plugins_loaded` — For early emoji cleanup
 - `comments_open` / `pings_open` — For disabling comments
 - `comments_array` — For hiding existing comments
@@ -159,6 +162,12 @@ The plugin uses various WordPress hooks and filters to achieve its functionality
 This plugin is provided as-is. For customizations or support, please contact the plugin author.
 
 ## Changelog
+
+### 1.2.2
+- Added a Gutenberg editor width override so the main content column is centered and widened without requiring theme CSS
+
+### 1.2.1
+- Upgraded the dashboard widget to use Lamcat branding, the bundled image asset, and a direct contact button
 
 ### 1.1.0
 - Added disable tags functionality
